@@ -8,13 +8,14 @@ import (
 	"log"
 	"math"
 	"net"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
 )
 
 var ClientPingTimeout = 3 * time.Second
-var ClientPingInterval = 100 * time.Millisecond
+var ClientPingInterval = 20 * time.Millisecond
 
 type clientPingRequestRecord struct {
 	sentTime time.Time
@@ -90,15 +91,16 @@ func (client *Client) startClientTimer() {
 				statsRequestCount := loss + pingRoundTripCount
 
 				pps := float64(statsRequestCount) / statsDurationSeconds
-				lossRatio := float64(loss/statsRequestCount) / statsDurationSeconds
+				lossRatio := float64(loss/statsRequestCount)
 
 				rttAvgMs := math.NaN()
 				rttStddevMs := math.NaN()
 				rttMinMs := math.NaN()
 				rttMaxMs := math.NaN()
+				rttP90Ms := math.NaN()
 
 				if pingRoundTripCount > 0 {
-					var rttSum, rttAvg, rttStddev, rttMin, rttMax time.Duration
+					var rttSum, rttAvg, rttMin, rttMax time.Duration
 					rttMin = -1
 					rttMax = -1
 					for _, v := range pingRoundTripDurations {
@@ -111,22 +113,30 @@ func (client *Client) startClientTimer() {
 						}
 					}
 					rttAvg = rttSum / time.Duration(pingRoundTripCount)
+					rttStddevMs = 0
 					for _, v := range pingRoundTripDurations {
-						d := v - rttAvg
-						rttStddev += d * d
+						d := (v - rttAvg).Seconds() * 1000
+						rttStddevMs += d * d
 					}
-					rttStddev = time.Duration(math.Sqrt(float64(rttStddev / time.Duration(pingRoundTripCount))))
+					rttStddevMs = math.Sqrt(rttStddevMs / float64(pingRoundTripCount))
 
 					rttAvgMs = rttAvg.Seconds() * 1000
 					rttMinMs = rttMin.Seconds() * 1000
 					rttMaxMs = rttMax.Seconds() * 1000
-					rttStddevMs = rttStddev.Seconds() * 1000
+
+					if pingRoundTripCount >= 10 {
+						sort.SliceStable(pingRoundTripDurations, func(i, j int) bool {
+							return pingRoundTripDurations[i] < pingRoundTripDurations[j]
+						})
+						p90idx := pingRoundTripCount*9/10
+						rttP90Ms = pingRoundTripDurations[p90idx].Seconds() * 1000
+					}
 				}
 
-				log.Printf("client stat %s (%s): pps=%.1f, loss=%.1f%%, round-trip time (ms): avg=%.1f, min=%.1f, max=%.1f, stddev=%.1f",
+				log.Printf("client stat %s (%s): pps=%.1f, loss=%.1f%%, round-trip time (ms): avg=%.1f, min=%.1f, max=%.1f, stddev=%.1f, p90=%.1f",
 					cs.key, cs.sessionId,
 					pps, lossRatio*100,
-					rttAvgMs, rttMinMs, rttMaxMs, rttStddevMs)
+					rttAvgMs, rttMinMs, rttMaxMs, rttStddevMs, rttP90Ms)
 			} else {
 				log.Printf("client stat %s (%s) new connection", cs.key, cs.sessionId)
 			}

@@ -126,7 +126,7 @@ func (server *Server) ServeEchoPingTcp(addr string) {
 				goto onError
 			}
 
-			log.Printf("server tcp accept conn: %s", tcpConn.RemoteAddr().String())
+			log.Printf("server tcp accept new conn: %s", tcpConn.RemoteAddr().String())
 			go server.handleEchoPingTcpConn(tcpConn)
 		}
 	onError:
@@ -163,6 +163,11 @@ func (server *Server) handleEchoPingTcpConn(conn *net.TCPConn) {
 		}
 		if data, err = br.ReadBytes('\n'); err != nil {
 			if e, ok := err.(net.Error); ok {
+				inactiveDur := time.Now().Sub(cs.lastActiveTime)
+				if inactiveDur < -ServerSessionTimeout || ServerSessionTimeout < inactiveDur {
+					log.Printf("server tcp conn %s session timeout", remoteAddr)
+					break
+				}
 				if e.Temporary() {
 					log.Printf("server tcp conn %s read error(temp): %v", remoteAddr, err)
 					err = nil
@@ -274,6 +279,7 @@ func (server *Server) processEchoPingUdpPacket(conn *net.UDPConn, packetInfo UDP
 		cs.udpChan = make(chan []byte, 100)
 		server.connSessions[csKey] = cs
 
+		log.Printf("server udp accept new conn: %s", remoteAddr)
 		go server.handleEchoPingUdpConn(cs, conn, packetInfo)
 	}
 	server.mu.Unlock()
