@@ -33,7 +33,7 @@ Usage:
   -listen-udp string
         listen UDP on ip:port
   -ping-interval duration
-        the interval between ping requests sent by client (default 100ms)
+        the interval between ping requests sent by client (default 20ms)
 ```
 
 Server output:

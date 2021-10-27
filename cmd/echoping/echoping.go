@@ -3,11 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/wxiaoguang/echoping/internal/echoping"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/wxiaoguang/echoping/internal/echoping"
 )
 
 func main() {

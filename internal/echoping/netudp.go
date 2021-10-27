@@ -1,10 +1,10 @@
 package echoping
 
 import (
-    "net"
-    "syscall"
     "bytes"
     "encoding/binary"
+    "net"
+    "syscall"
 )
 
 // UDPPacketInfo holds the remote address and the associated
