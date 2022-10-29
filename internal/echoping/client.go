@@ -18,24 +18,24 @@ var ClientPingTimeout = 3 * time.Second
 var ClientPingInterval = 20 * time.Millisecond
 
 type clientPingRequestRecord struct {
-	sentTime time.Time
+	sentTime  time.Time
 	sentBytes int64
-	recvTime time.Time
+	recvTime  time.Time
 	recvBytes int64
 }
 
 type clientConnSession struct {
-	key string
+	key        string
 	remoteAddr string
-	sessionId string
+	sessionId  string
 
 	pingRequestRecords map[string]*clientPingRequestRecord
-	mu sync.Mutex
+	mu                 sync.Mutex
 }
 
 type Client struct {
 	connSessions map[string]*clientConnSession
-	mu sync.Mutex
+	mu           sync.Mutex
 
 	onceClientTimer sync.Once
 }
@@ -91,7 +91,7 @@ func (client *Client) startClientTimer() {
 				statsRequestCount := loss + pingRoundTripCount
 
 				pps := float64(statsRequestCount) / statsDurationSeconds
-				lossRatio := float64(loss/statsRequestCount)
+				lossRatio := float64(loss) / float64(statsRequestCount)
 
 				rttAvgMs := math.NaN()
 				rttStddevMs := math.NaN()
@@ -128,7 +128,7 @@ func (client *Client) startClientTimer() {
 						sort.SliceStable(pingRoundTripDurations, func(i, j int) bool {
 							return pingRoundTripDurations[i] < pingRoundTripDurations[j]
 						})
-						p90idx := pingRoundTripCount*9/10
+						p90idx := pingRoundTripCount * 9 / 10
 						rttP90Ms = pingRoundTripDurations[p90idx].Seconds() * 1000
 					}
 				}
@@ -329,14 +329,14 @@ func (client *Client) ConnectEchoPingUdp(addr string) {
 		wg.Add(2)
 
 		go func() {
-			loop:
+		loop:
 			for !exitLoop {
 				pingTime := time.Now()
 				data := client.preparePingRequest(pingTime, cs, msgMap)
-				if _, err := conn.WriteToUDP(data, udpRemoteAddr); err != nil {
-					log.Printf("client udp conn %s write error: %s", addr, err)
-					break loop
-				}
+					if _, err := conn.WriteToUDP(data, udpRemoteAddr); err != nil {
+						log.Printf("client udp conn %s write error: %s", addr, err)
+						break loop
+					}
 				elapsed := time.Now().Sub(pingTime)
 				sleepDuration := ClientPingInterval - elapsed
 				if sleepDuration > 0 {
@@ -350,7 +350,7 @@ func (client *Client) ConnectEchoPingUdp(addr string) {
 			buf := make([]byte, 65536)
 			var n int
 			var err error
-			loop:
+		loop:
 			for !exitLoop {
 				_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 				if n, _, err = conn.ReadFromUDP(buf); err != nil {
