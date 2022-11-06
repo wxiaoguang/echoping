@@ -27,7 +27,7 @@ func (client *Client) ConnectEchoPingUdp(addr string) {
 		var wg *sync.WaitGroup
 
 		exitLoop := false
-		msgMap := map[string]interface{}{}
+		msgMap := map[string]any{}
 		{
 			var err error
 			if udpListenAddr, err = net.ResolveUDPAddr("udp", ":0"); err != nil {

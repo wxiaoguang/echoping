@@ -152,7 +152,7 @@ func (client *Client) startClientTimer() {
 	}()
 }
 
-func (client *Client) preparePingRequest(t time.Time, cs *clientConnSession, msgMap map[string]interface{}) []byte {
+func (client *Client) preparePingRequest(t time.Time, cs *clientConnSession, msgMap map[string]any) []byte {
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
@@ -163,8 +163,8 @@ func (client *Client) preparePingRequest(t time.Time, cs *clientConnSession, msg
 	return data
 }
 
-func (client *Client) processPingResponse(t time.Time, cs *clientConnSession, data []byte) (map[string]interface{}, error) {
-	msgMap := map[string]interface{}{}
+func (client *Client) processPingResponse(t time.Time, cs *clientConnSession, data []byte) (map[string]any, error) {
+	msgMap := map[string]any{}
 	err := json.Unmarshal(data, &msgMap)
 	if err != nil {
 		return nil, err

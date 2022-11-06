@@ -8,7 +8,8 @@ import (
 	"time"
 )
 
-var ServerSessionTimeout = 3 * time.Second
+const ServerSessionTimeout = 3 * time.Second
+const ServerQuicProto = "echoping"
 
 type serverConnStat struct {
 	pings      int64
@@ -43,12 +44,12 @@ func NewServer() *Server {
 	return s
 }
 
-func (server *Server) processEchoPingMessage(cs *serverConnSession, data []byte) (m map[string]interface{}, err error) {
+func (server *Server) processEchoPingMessage(cs *serverConnSession, data []byte) (m map[string]any, err error) {
 	cs.lastActiveTime = time.Now()
 	atomic.AddInt64(&cs.stat.pings, 1)
 	atomic.AddInt64(&cs.stat.bytes, int64(len(data)))
 
-	m = map[string]interface{}{}
+	m = map[string]any{}
 	if err = json.Unmarshal(data, &m); err != nil {
 		return nil, err
 	}
