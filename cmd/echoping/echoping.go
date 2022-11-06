@@ -16,12 +16,12 @@ func main() {
 	var argListen, argListenTcp, argListenUdp string
 	var argConnect, argLossRatio string
 
-	flag.StringVar(&argListen, "listen", "", "listen both TCP and UDP on ip:port (UDP also works for QUIC)")
-	flag.StringVar(&argListenTcp, "listen-tcp", "", "listen TCP on ip:port")
-	flag.StringVar(&argListenUdp, "listen-udp", "", "listen UDP on ip:port (UDP also works for QUIC)")
-	flag.StringVar(&argConnect, "connect", "", "connect to 'tcp://ip:port/,udp://ip:port/,quic://ip:port/' (can be repeated, use comma as delimiter), or use 'ip:port' for all TCP/UDP/QUIC")
-	flag.DurationVar(&echoping.ClientPingInterval, "ping-interval", echoping.ClientPingInterval, "the interval between ping requests sent by client")
-	flag.StringVar(&argLossRatio, "loss-ratio", argLossRatio, `the simulated UDP loss ratio on client side, eg: "0.1"" means 10% packet loss, "0.1,0.2" means 0.1 for sending and 0.2 for receiving`)
+	flag.StringVar(&argListen, "listen", "", "Listen both TCP and UDP on ip:port (UDP also works for QUIC)")
+	flag.StringVar(&argListenTcp, "listen-tcp", "", "Listen TCP on ip:port")
+	flag.StringVar(&argListenUdp, "listen-udp", "", "Listen UDP on ip:port (UDP also works for QUIC)")
+	flag.StringVar(&argConnect, "connect", "", "Connect to 'tcp://ip:port/,udp://ip:port/,quic://ip:port/' (can be repeated, use comma as delimiter), or use 'ip:port' for all TCP/UDP/QUIC")
+	flag.DurationVar(&echoping.ClientPingInterval, "ping-interval", echoping.ClientPingInterval, "The interval between ping requests sent by client")
+	flag.StringVar(&argLossRatio, "loss-ratio", argLossRatio, `The simulated UDP loss ratio on client side (must be used with "-connect"). "0.1"" means 10% packet loss, "0.1,0.2" means 0.1 for sending and 0.2 for receiving`)
 	flag.Parse()
 
 	if argListen != "" {
