@@ -27,28 +27,28 @@ func (server *Server) handleServerStream(sessionKey string, remoteAddr net.Addr,
 	var data []byte
 	for {
 		if err = conn.SetDeadline(time.Now().Add(ServerSessionTimeout)); err != nil {
-			log.Printf("server tcp conn %s set read deadline error(serious): %v", remoteAddr, err)
+			log.Printf("server conn %s set read deadline error(serious): %v", sessionKey, err)
 			break
 		}
 		if data, err = br.ReadBytes('\n'); err != nil {
 			if e, ok := err.(net.Error); ok {
 				inactiveDur := time.Now().Sub(cs.lastActiveTime)
 				if inactiveDur < -ServerSessionTimeout || ServerSessionTimeout < inactiveDur || e.Timeout() {
-					log.Printf("server tcp conn %s session timeout", remoteAddr)
+					log.Printf("server conn %s session timeout", sessionKey)
 				}
 			}
 			break
 		}
 
 		if _, err = server.processEchoPingMessage(cs, data); err != nil {
-			log.Printf("server tcp conn %s message error(temp): %v", remoteAddr, err)
+			log.Printf("server conn %s message error(temp): %v", sessionKey, err)
 			err = nil
 			atomic.AddInt64(&cs.stat.tempErrors, 1)
 			continue
 		}
 
 		if err = conn.SetDeadline(time.Now().Add(ServerSessionTimeout)); err != nil {
-			log.Printf("server tcp conn %s set write deadline error(serious): %v", remoteAddr, err)
+			log.Printf("server conn %s set write deadline error(serious): %v", sessionKey, err)
 			break
 		}
 		if _, err = conn.Write(data); err != nil {
@@ -57,9 +57,9 @@ func (server *Server) handleServerStream(sessionKey string, remoteAddr net.Addr,
 	}
 
 	if err == io.EOF {
-		log.Printf("server tcp conn %s closed gracefully: %v", remoteAddr, err)
+		log.Printf("server conn %s closed gracefully: %v", sessionKey, err)
 	} else {
-		log.Printf("server tcp conn %s closed broken: %v", remoteAddr, err)
+		log.Printf("server conn %s closed broken: %v", sessionKey, err)
 	}
 
 	server.mu.Lock()

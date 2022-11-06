@@ -5,10 +5,11 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	_ "github.com/lucas-clemente/quic-go"
 	"log"
+	"net"
 	"time"
 )
 
-func (server *Server) ServeEchoPingQuic(c *UDPConnMuxChan) {
+func (server *Server) serveEchoPingUdpQuic(c net.PacketConn) {
 	for {
 		var stream quic.Stream
 		{

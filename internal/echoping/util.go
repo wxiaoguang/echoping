@@ -6,7 +6,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"math/big"
+	"time"
 )
 
 func generateTLSConfig() *tls.Config {
@@ -30,4 +32,9 @@ func generateTLSConfig() *tls.Config {
 		Certificates: []tls.Certificate{tlsCert},
 		NextProtos:   []string{ServerQuicProto},
 	}
+}
+
+func generateSessionId() string {
+	now := time.Now()
+	return fmt.Sprintf("%04d%02d%02d-%02d%02d%02d.%06d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond()/1e3)
 }

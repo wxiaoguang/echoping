@@ -3,14 +3,13 @@ package echoping
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"github.com/lucas-clemente/quic-go"
+	"log"
 	"net"
 	"time"
 )
 
-func (client *Client) ConnectEchoPingQuic(c *UDPConnMuxChan, addr string) {
-	client.onceClientTimer.Do(client.startClientTimer)
+func (client *Client) handleClientUdpQuic(addr string, remoteAddr *net.UDPAddr, udpConn net.PacketConn) {
 
 	tlsConf := &tls.Config{
 		InsecureSkipVerify: true,
@@ -20,23 +19,18 @@ func (client *Client) ConnectEchoPingQuic(c *UDPConnMuxChan, addr string) {
 	for {
 		var stream quic.Stream
 		{
-			ipAddr, err := net.ResolveIPAddr("udp", addr)
+			conn, err := quic.Dial(udpConn, remoteAddr, "echoping-host", tlsConf, nil)
 			if err != nil {
-				fmt.Printf("client quic conn %s resolve error: %s", addr, err)
-				goto onError
-			}
-			conn, err := quic.Dial(c, ipAddr, "echoping-host", tlsConf, nil)
-			if err != nil {
-				fmt.Printf("client quic conn %s dial error: %s", addr, err)
+				log.Printf("client quic conn %s dial error: %s", addr, err)
 				goto onError
 			}
 			stream, err = conn.OpenStreamSync(context.Background())
 			if err != nil {
-				fmt.Printf("client quic conn %s open stream error: %s", addr, err)
+				log.Printf("client quic conn %s open stream error: %s", addr, err)
 				goto onError
 			}
 
-			client.handleClientStream("tcp:"+addr, conn.RemoteAddr(), stream)
+			client.handleClientStream("quic:"+addr, remoteAddr, stream)
 		}
 	onError:
 		if stream != nil {

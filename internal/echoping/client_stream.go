@@ -2,7 +2,6 @@ package echoping
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -10,14 +9,12 @@ import (
 )
 
 func (client *Client) handleClientStream(sessionKey string, remoteAddr net.Addr, conn ConnStream) {
-	now := time.Now()
-
 	cs := &clientConnSession{
 		key:                sessionKey,
 		remoteAddr:         remoteAddr.String(),
 		pingRequestRecords: map[string]*clientPingRequestRecord{},
+		sessionId:          generateSessionId(),
 	}
-	cs.sessionId = fmt.Sprintf("%04d%02d%02d-%02d%02d%02d.%06d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second(), now.Nanosecond()/1e3)
 
 	client.mu.Lock()
 	client.connSessions[cs.key] = cs

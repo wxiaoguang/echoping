@@ -12,8 +12,7 @@ func (server *Server) ServeEchoPingUdp(addr string) {
 
 	for {
 		var udpAddr *net.UDPAddr
-		var udpConnRaw *net.UDPConn
-		var udpConn *UDPConnWithInfo
+		var udpConn *net.UDPConn
 		var err error
 
 		udpAddr, err = net.ResolveUDPAddr("udp", addr)
@@ -21,60 +20,61 @@ func (server *Server) ServeEchoPingUdp(addr string) {
 			log.Printf("server udp resolve addr error: %v", err)
 			goto onError
 		}
-		udpConnRaw, err = net.ListenUDP("udp", udpAddr)
+		udpConn, err = net.ListenUDP("udp", udpAddr)
 		if err != nil {
 			log.Printf("server udp listen error: %v", err)
 			goto onError
 		}
-		udpConn, err = NewUDPConnWithInfo(udpConnRaw)
-		if err != nil {
-			log.Printf("server udp init error: %v", err)
-			goto onError
+
+		{
+			connPacket, connQuic := UDPConnMux(udpConn, 1024)
+			go server.serveEchoPingUdpPacket(connPacket)
+			go server.serveEchoPingUdpQuic(connQuic)
+			select {} // TODO: better error handling
 		}
 
-		for {
-			buf := make([]byte, 4096)
-			for {
-				n, packetInfo, err := udpConn.ReadMsgUDPWithInfo(buf)
-				if err != nil {
-					log.Printf("server udp conn read error(serious): %v", err)
-					goto onError
-				}
-
-				server.processEchoPingUdpPacket(udpConn, packetInfo, buf[0:n])
-			}
-		}
 	onError:
-		if udpConnRaw != nil {
-			_ = udpConnRaw.Close()
-			udpConnRaw = nil
+		if udpConn != nil {
+			_ = udpConn.Close()
 		}
 		time.Sleep(time.Second)
 	}
 }
 
-func (server *Server) processEchoPingUdpPacket(conn *UDPConnWithInfo, packetInfo *UDPPacketInfo, data []byte) {
-	remoteAddr := packetInfo.RemoteAddr().String()
+func (server *Server) serveEchoPingUdpPacket(conn net.PacketConn) {
+	buf := make([]byte, 4096)
 
-	server.mu.Lock()
-	csKey := "udp:" + remoteAddr
-	cs := server.connSessions[csKey]
-	if cs == nil {
-		cs = &serverConnSession{}
-		cs.key = csKey
-		cs.remoteAddr = remoteAddr
-		cs.lastActiveTime = time.Now()
-		cs.udpChan = make(chan []byte, 100)
-		server.connSessions[csKey] = cs
+	// TODO: better error handling
+	for {
+		n, remoteAddr, err := conn.ReadFrom(buf)
+		if err != nil {
+			log.Printf("server udp conn read error(serious): %v", err)
+			time.Sleep(time.Second)
+			continue
+		}
 
-		log.Printf("server udp accept new conn: %s", remoteAddr)
-		go server.handleEchoPingUdpConn(cs, conn, packetInfo)
+		server.mu.Lock()
+		csKey := "udp:" + remoteAddr.String()
+		cs := server.connSessions[csKey]
+		if cs == nil {
+			cs = &serverConnSession{}
+			cs.key = csKey
+			cs.remoteAddr = remoteAddr.String()
+			cs.lastActiveTime = time.Now()
+			cs.udpChan = make(chan []byte, 100)
+			server.connSessions[csKey] = cs
+
+			log.Printf("server udp accept new conn: %s", remoteAddr)
+			go server.handleEchoPingUdpPacket(cs, conn, remoteAddr)
+		}
+		server.mu.Unlock()
+
+		data := buf[:n]
+		cs.udpChan <- data
 	}
-	server.mu.Unlock()
-	cs.udpChan <- data
 }
 
-func (server *Server) handleEchoPingUdpConn(cs *serverConnSession, conn *UDPConnWithInfo, packetInfo *UDPPacketInfo) {
+func (server *Server) handleEchoPingUdpPacket(cs *serverConnSession, conn net.PacketConn, remoteAddr net.Addr) {
 	var err error
 	t1s := time.Tick(time.Second)
 
@@ -91,7 +91,7 @@ loop:
 				atomic.AddInt64(&cs.stat.tempErrors, 1)
 				continue loop
 			}
-			if _, err = conn.WriteMsgUDPWithInfo(data, packetInfo); err != nil {
+			if _, err = conn.WriteTo(data, remoteAddr); err != nil {
 				log.Printf("server udp conn %s write error(serious): %v", cs.remoteAddr, err)
 				break loop
 			}

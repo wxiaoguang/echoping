@@ -15,10 +15,10 @@ func main() {
 	var argListen, argListenTcp, argListenUdp string
 	var argConnect string
 
-	flag.StringVar(&argListen, "listen", "", "listen both TCP and UDP on ip:port")
+	flag.StringVar(&argListen, "listen", "", "listen both TCP and UDP on ip:port (UDP also works for QUIC)")
 	flag.StringVar(&argListenTcp, "listen-tcp", "", "listen TCP on ip:port")
-	flag.StringVar(&argListenUdp, "listen-udp", "", "listen UDP on ip:port")
-	flag.StringVar(&argConnect, "connect", "", "connect to 'tcp://ip:port/,udp://ip:port/' (can be repeated, use comma as delimiter), or use 'ip:port' for both TCP and UDP")
+	flag.StringVar(&argListenUdp, "listen-udp", "", "listen UDP on ip:port (UDP also works for QUIC)")
+	flag.StringVar(&argConnect, "connect", "", "connect to 'tcp://ip:port/,udp://ip:port/,quic://ip:port/' (can be repeated, use comma as delimiter), or use 'ip:port' for all TCP/UDP/QUIC")
 	flag.DurationVar(&echoping.ClientPingInterval, "ping-interval", echoping.ClientPingInterval, "the interval between ping requests sent by client")
 	flag.Parse()
 
@@ -51,7 +51,7 @@ func main() {
 		})
 	}
 	if argConnect != "" {
-		if echoping.ClientPingInterval <= 0 || echoping.ClientPingInterval > 500 * time.Millisecond {
+		if echoping.ClientPingInterval <= 0 || echoping.ClientPingInterval > 500*time.Millisecond {
 			fmt.Printf("client ping interval should be between 0 and 500ms")
 			os.Exit(2)
 		}
@@ -59,8 +59,9 @@ func main() {
 		var connectTargets []string
 		for _, connectField := range connectFields {
 			if strings.Index(connectField, "://") == -1 {
-				connectTargets = append(connectTargets, "tcp://" + connectField)
-				connectTargets = append(connectTargets, "udp://" + connectField)
+				connectTargets = append(connectTargets, "tcp://"+connectField)
+				connectTargets = append(connectTargets, "udp://"+connectField)
+				connectTargets = append(connectTargets, "quic://"+connectField)
 			} else {
 				connectTargets = append(connectTargets, connectField)
 			}
@@ -81,9 +82,9 @@ func main() {
 				goServe(func() {
 					client.ConnectEchoPingTcp(u.Hostname() + ":" + port)
 				})
-			} else if u.Scheme == "udp" {
+			} else if u.Scheme == "udp" || u.Scheme == "quic" {
 				goServe(func() {
-					client.ConnectEchoPingUdp(u.Hostname() + ":" + port)
+					client.ConnectEchoPingUdp(u.Scheme, u.Hostname()+":"+port)
 				})
 			} else {
 				fmt.Printf("can not parse connect target protocol: %s", connectTarget)
