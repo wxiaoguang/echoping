@@ -3,6 +3,7 @@ package echoping
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"sort"
@@ -54,6 +55,9 @@ func (client *Client) startClientTimer() {
 
 		now := time.Now()
 
+		statMessages := map[string]string{}
+		var statKeys []string
+
 		// ping: round-trip min/avg/max/stddev = 9.993/15.272/20.551/5.279 ms
 		for _, cs := range client.connSessions {
 			cs.mu.Lock()
@@ -82,6 +86,8 @@ func (client *Client) startClientTimer() {
 				}
 			}
 			cs.mu.Unlock()
+
+			var statMessage string
 			if !statsTimeBegin.IsZero() && statsTimeBegin != statsTimeEnd {
 				statsDurationSeconds := statsTimeEnd.Sub(statsTimeBegin).Seconds()
 				pingRoundTripCount := len(pingRoundTripDurations)
@@ -130,14 +136,20 @@ func (client *Client) startClientTimer() {
 					}
 				}
 
-				log.Printf("client stat %s (%s): pps=%.1f, loss=%.1f%%, round-trip time (ms): avg=%.1f, min=%.1f, max=%.1f, stddev=%.1f, p90=%.1f",
+				statMessage = fmt.Sprintf("client stat %s (%s): pps=%.1f, loss=%.1f%%, round-trip time (ms): avg=%.1f, min=%.1f, max=%.1f, stddev=%.1f, p90=%.1f",
 					cs.key, cs.sessionId,
 					pps, lossRatio*100,
 					rttAvgMs, rttMinMs, rttMaxMs, rttStddevMs, rttP90Ms)
 			} else {
-				log.Printf("client stat %s (%s) new connection", cs.key, cs.sessionId)
+				statMessage = fmt.Sprintf("client stat %s (%s) new connection", cs.key, cs.sessionId)
 			}
+			statKeys = append(statKeys, cs.key)
+			statMessages[cs.key] = statMessage
+		}
 
+		sort.Strings(statKeys)
+		for _, statKey := range statKeys {
+			log.Println(statMessages[statKey])
 		}
 	}
 

@@ -27,7 +27,7 @@ func (server *Server) ServeEchoPingUdp(addr string) {
 		}
 
 		{
-			connPacket, connQuic := UDPConnMux(udpConn, 1024)
+			connPacket, connQuic := UDPConnMux(udpConn, 1024, 0, 0)
 			go server.serveEchoPingUdpPacket(connPacket)
 			go server.serveEchoPingUdpQuic(connQuic)
 			select {} // TODO: better error handling

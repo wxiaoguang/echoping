@@ -2,7 +2,9 @@ package echoping
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -66,6 +68,10 @@ func (server *Server) startServerTimer() {
 
 		now := time.Now()
 		d2s := 2 * time.Second
+
+		statMessages := map[string]string{}
+		var statKeys []string
+
 		for _, cs := range server.connSessions {
 			dur := now.Sub(cs.lastStatTimes[1])
 			if cs.stat != cs.lastStats[1] || (dur < -d2s || d2s < dur) {
@@ -74,16 +80,24 @@ func (server *Server) startServerTimer() {
 				cs.lastStats[1] = cs.stat
 				cs.lastStatTimes[1] = now
 			}
+			var statMessage string
 			if !cs.lastStatTimes[0].IsZero() {
 				durSecs := cs.lastStatTimes[1].Sub(cs.lastStatTimes[0]).Seconds()
 
 				// bps := float64(cs.lastStats[1].bytes - cs.lastStats[0].bytes) / durSecs
 				pps := float64(cs.lastStats[1].pings-cs.lastStats[0].pings) / durSecs
 				tmperr := cs.lastStats[1].tempErrors - cs.lastStats[0].tempErrors
-				log.Printf("server stat %s (%s): pps=%.1f, tmperr=%d", cs.key, cs.sessionId, pps, tmperr)
+				statMessage = fmt.Sprintf("server stat %s (%s): pps=%.1f, tmperr=%d", cs.key, cs.sessionId, pps, tmperr)
 			} else {
-				log.Printf("server stat %s (%s): new connection", cs.key, cs.sessionId)
+				statMessage = fmt.Sprintf("server stat %s (%s): new connection", cs.key, cs.sessionId)
 			}
+			statMessages[cs.key] = statMessage
+			statKeys = append(statKeys, cs.key)
+		}
+
+		sort.Strings(statKeys)
+		for _, key := range statKeys {
+			log.Println(statMessages[key])
 		}
 	}
 

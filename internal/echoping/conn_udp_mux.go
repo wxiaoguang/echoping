@@ -2,6 +2,7 @@ package echoping
 
 import (
 	"log"
+	"math/rand"
 	"net"
 	"sync"
 	"syscall"
@@ -199,7 +200,7 @@ func (c *UDPConnMuxChan) DequeueSend() (remoteAddr net.Addr, p []byte, err error
 	return item.RemoteAddr, item.PacketData, nil
 }
 
-func UDPConnMux(conn *net.UDPConn, queueSize int) (connForPacket net.PacketConn, connForQuic net.PacketConn) {
+func UDPConnMux(conn *net.UDPConn, queueSize int, lossRatioSend, lossRatioRecv float64) (connForPacket net.PacketConn, connForQuic net.PacketConn) {
 	connPacket := NewUDPConnMuxChan(conn, queueSize)
 	connQuic := NewUDPConnMuxChan(conn, queueSize)
 
@@ -210,12 +211,16 @@ func UDPConnMux(conn *net.UDPConn, queueSize int) (connForPacket net.PacketConn,
 		_ = connQuic.Close()
 	}
 	go func() {
+		mprng := rand.New(rand.NewSource(time.Now().UnixNano()))
 		for {
 			p := make([]byte, 4096)
 			n, addr, err := conn.ReadFrom(p)
 			if n == 0 || err != nil {
 				closeMuxChans()
 				break
+			}
+			if mprng.Float64() < lossRatioRecv {
+				continue
 			}
 			p = p[:n]
 			if p[0] == 'P' {
@@ -230,11 +235,15 @@ func UDPConnMux(conn *net.UDPConn, queueSize int) (connForPacket net.PacketConn,
 	}()
 
 	dequeueSend := func(c *UDPConnMuxChan, tag byte) {
+		mprng := rand.New(rand.NewSource(time.Now().UnixNano()))
 		for {
 			remoteAddr, payload, err := c.DequeueSend()
 			if err != nil {
 				_ = c.Close()
 				break
+			}
+			if mprng.Float64() < lossRatioSend {
+				continue
 			}
 			p := make([]byte, len(payload)+1)
 			p[0] = tag

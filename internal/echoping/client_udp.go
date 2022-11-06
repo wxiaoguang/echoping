@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (client *Client) ConnectEchoPingUdp(scheme string, addr string) {
+func (client *Client) ConnectEchoPingUdp(scheme string, addr string, lossRatioSend, lossRatioRecv float64) {
 	client.onceClientTimer.Do(client.startClientTimer)
 
 	for {
@@ -30,7 +30,7 @@ func (client *Client) ConnectEchoPingUdp(scheme string, addr string) {
 			goto onError
 		}
 		{
-			connPacket, connQuic := UDPConnMux(conn, 1024)
+			connPacket, connQuic := UDPConnMux(conn, 1024, lossRatioSend, lossRatioRecv)
 
 			if scheme == "udp" {
 				client.handleClientUdpPacket(addr, udpRemoteAddr, connPacket)
