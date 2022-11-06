@@ -29,7 +29,7 @@ func (server *Server) serveEchoPingUdpQuic(c net.PacketConn) {
 				log.Printf("server quic accept stream error: %s", err)
 				goto onError
 			}
-			go server.handleServerStream("quic:"+conn.RemoteAddr().String(), conn.RemoteAddr(), stream)
+			server.handleServerStream("quic:"+conn.RemoteAddr().String(), conn.RemoteAddr(), stream)
 		}
 	onError:
 		if stream != nil {
