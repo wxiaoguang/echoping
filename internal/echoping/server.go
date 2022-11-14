@@ -1,6 +1,7 @@
 package echoping
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -47,12 +48,17 @@ func NewServer() *Server {
 }
 
 func (server *Server) processEchoPingMessage(cs *serverConnSession, data []byte) (m map[string]any, err error) {
+	jsonLen := bytes.IndexByte(data, 0)
+	if jsonLen == -1 {
+		jsonLen = len(data)
+	}
+
 	cs.lastActiveTime = time.Now()
 	atomic.AddInt64(&cs.stat.pings, 1)
 	atomic.AddInt64(&cs.stat.bytes, int64(len(data)))
 
 	m = map[string]any{}
-	if err = json.Unmarshal(data, &m); err != nil {
+	if err = json.Unmarshal(data[:jsonLen], &m); err != nil {
 		return nil, err
 	}
 	if sessionId, ok := m["sid"].(string); ok {

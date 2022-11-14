@@ -25,7 +25,7 @@ func (client *Client) handleClientStream(sessionKey string, remoteAddr net.Addr,
 	exitLoop := false
 	msgMap := map[string]any{}
 	msgMap["sid"] = cs.sessionId
-	log.Printf("client tcp conn dialed: %s, sid=%s", remoteAddr, cs.sessionId)
+	log.Printf("client stream conn dialed: %s, sid=%s", remoteAddr, cs.sessionId)
 
 	wg = &sync.WaitGroup{}
 	wg.Add(2)
@@ -35,14 +35,14 @@ func (client *Client) handleClientStream(sessionKey string, remoteAddr net.Addr,
 		for !exitLoop {
 			pingTime := time.Now()
 			if err = conn.SetDeadline(pingTime.Add(ClientPingTimeout)); err != nil {
-				log.Printf("client tcp conn %s set write deadline error: %s", remoteAddr, err)
+				log.Printf("client stream conn %s set write deadline error: %s", remoteAddr, err)
 				break loop
 			}
 
 			data := client.preparePingRequest(pingTime, cs, msgMap)
 			data = append(data, '\n')
 			if _, err = conn.Write(data); err != nil {
-				log.Printf("client tcp conn %s write error: %s", remoteAddr, err)
+				log.Printf("client stream conn %s write error: %s", remoteAddr, err)
 				break loop
 			}
 
@@ -61,16 +61,16 @@ func (client *Client) handleClientStream(sessionKey string, remoteAddr net.Addr,
 	loop:
 		for !exitLoop {
 			if err = conn.SetDeadline(time.Now().Add(ClientPingTimeout)); err != nil {
-				log.Printf("client tcp conn %s set read deadline error: %s", remoteAddr, err)
+				log.Printf("client stream conn %s set read deadline error: %s", remoteAddr, err)
 				break loop
 			}
 			if data, err = br.ReadBytes('\n'); err != nil {
-				log.Printf("client tcp conn %s read error: %s", remoteAddr, err)
+				log.Printf("client stream conn %s read error: %s", remoteAddr, err)
 				break loop
 			}
 			_, err = client.processPingResponse(time.Now(), cs, data)
 			if err != nil {
-				log.Printf("client tcp conn %s message error: %s", remoteAddr, err)
+				log.Printf("client stream conn %s message error: %s", remoteAddr, err)
 				break loop
 			}
 		}

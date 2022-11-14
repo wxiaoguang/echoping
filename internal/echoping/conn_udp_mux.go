@@ -1,7 +1,6 @@
 package echoping
 
 import (
-	"log"
 	"math/rand"
 	"net"
 	"sync"
@@ -223,18 +222,15 @@ func UDPConnMux(conn *net.UDPConn, queueSize int, lossRatioSend, lossRatioRecv f
 				continue
 			}
 			p = p[:n]
-			if p[0] == 'P' {
-				_ = connPacket.EnqueueRecv(addr, p[1:])
-			} else if p[0] == 'Q' {
-				_ = connQuic.EnqueueRecv(addr, p[1:])
+			if p[0] == '{' {
+				_ = connPacket.EnqueueRecv(addr, p)
 			} else {
-				// TODO: unknown udp message. Ignore at the moment.
-				log.Printf("uknown udp message: %v", p)
+				_ = connQuic.EnqueueRecv(addr, p)
 			}
 		}
 	}()
 
-	dequeueSend := func(c *UDPConnMuxChan, tag byte) {
+	dequeueSend := func(c *UDPConnMuxChan) {
 		mprng := rand.New(rand.NewSource(time.Now().UnixNano()))
 		for {
 			remoteAddr, payload, err := c.DequeueSend()
@@ -245,15 +241,12 @@ func UDPConnMux(conn *net.UDPConn, queueSize int, lossRatioSend, lossRatioRecv f
 			if mprng.Float64() < lossRatioSend {
 				continue
 			}
-			p := make([]byte, len(payload)+1)
-			p[0] = tag
-			copy(p[1:], payload)
-			_, _ = conn.WriteTo(p, remoteAddr)
+			_, _ = conn.WriteTo(payload, remoteAddr)
 		}
 	}
 
-	go dequeueSend(connPacket, 'P')
-	go dequeueSend(connQuic, 'Q')
+	go dequeueSend(connPacket)
+	go dequeueSend(connQuic)
 
 	return connPacket, connQuic
 }

@@ -15,6 +15,7 @@ import (
 func main() {
 	var argListen, argListenTcp, argListenUdp string
 	var argConnect, argLossRatio string
+	var payloadSize int
 
 	flag.StringVar(&argListen, "listen", "", "Listen both TCP and UDP on ip:port (UDP also works for QUIC)")
 	flag.StringVar(&argListenTcp, "listen-tcp", "", "Listen TCP on ip:port")
@@ -22,6 +23,7 @@ func main() {
 	flag.StringVar(&argConnect, "connect", "", "Connect to 'tcp://ip:port/,udp://ip:port/,quic://ip:port/' (can be repeated, use comma as delimiter), or use 'ip:port' for all TCP/UDP/QUIC")
 	flag.DurationVar(&echoping.ClientPingInterval, "ping-interval", echoping.ClientPingInterval, "The interval between ping requests sent by client")
 	flag.StringVar(&argLossRatio, "loss-ratio", argLossRatio, `The simulated UDP loss ratio on client side (must be used with "-connect"). "0.1"" means 10% packet loss, "0.1,0.2" means 0.1 for sending and 0.2 for receiving`)
+	flag.IntVar(&payloadSize, "payload-size", 1300, "The payload size of ping request")
 	flag.Parse()
 
 	if argListen != "" {
@@ -40,7 +42,7 @@ func main() {
 	}
 
 	server := echoping.NewServer()
-	client := echoping.NewClient()
+	client := echoping.NewClient(payloadSize)
 
 	if argListenTcp != "" {
 		goServe(func() {

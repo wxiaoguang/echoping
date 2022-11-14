@@ -1,11 +1,13 @@
 package echoping
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"sort"
 	"strconv"
 	"sync"
@@ -32,14 +34,17 @@ type clientConnSession struct {
 }
 
 type Client struct {
+	payloadSize int
+
 	connSessions map[string]*clientConnSession
 	mu           sync.Mutex
 
 	onceClientTimer sync.Once
 }
 
-func NewClient() *Client {
+func NewClient(payloadSize int) *Client {
 	c := &Client{
+		payloadSize:  payloadSize,
 		connSessions: map[string]*clientConnSession{},
 	}
 	return c
@@ -65,6 +70,7 @@ func (client *Client) startClientTimer() {
 			pingRoundTripDurations := make([]time.Duration, 0, len(cs.pingRequestRecords))
 
 			var statsTimeBegin, statsTimeEnd time.Time
+			var recvBytesSum int64
 			for key, reqRec := range cs.pingRequestRecords {
 				pingSentDur := now.Sub(reqRec.sentTime)
 				if pingSentDur < -d2s || d2s < pingSentDur {
@@ -78,10 +84,10 @@ func (client *Client) startClientTimer() {
 						statsTimeEnd = reqRec.sentTime
 					}
 					if reqRec.recvTime.IsZero() {
-						// packet lost, no response in 1 second
-						loss++
+						loss++ // packet lost, no response in 1 second
 					} else {
 						pingRoundTripDurations = append(pingRoundTripDurations, reqRec.recvTime.Sub(reqRec.sentTime))
+						recvBytesSum += reqRec.recvBytes
 					}
 				}
 			}
@@ -95,6 +101,7 @@ func (client *Client) startClientTimer() {
 
 				pps := float64(statsRequestCount) / statsDurationSeconds
 				lossRatio := float64(loss) / float64(statsRequestCount)
+				recvSpeed := float64(recvBytesSum) / statsDurationSeconds
 
 				rttAvgMs := math.NaN()
 				rttStddevMs := math.NaN()
@@ -136,9 +143,9 @@ func (client *Client) startClientTimer() {
 					}
 				}
 
-				statMessage = fmt.Sprintf("client stat %s (%s): pps=%.1f, loss=%.1f%%, round-trip time (ms): avg=%.1f, min=%.1f, max=%.1f, stddev=%.1f, p90=%.1f",
+				statMessage = fmt.Sprintf("client stat %s (%s): pps=%.1f, loss=%.1f%%, recv=%.2fMB/s, round-trip time (ms): avg=%.1f, min=%.1f, max=%.1f, stddev=%.1f, p90=%.1f",
 					cs.key, cs.sessionId,
-					pps, lossRatio*100,
+					pps, lossRatio*100, recvSpeed/(1024*1024),
 					rttAvgMs, rttMinMs, rttMaxMs, rttStddevMs, rttP90Ms)
 			} else {
 				statMessage = fmt.Sprintf("client stat %s (%s) new connection", cs.key, cs.sessionId)
@@ -165,19 +172,33 @@ func (client *Client) startClientTimer() {
 }
 
 func (client *Client) preparePingRequest(t time.Time, cs *clientConnSession, msgMap map[string]any) []byte {
+	const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	cs.mu.Lock()
 	defer cs.mu.Unlock()
 
 	pingId := strconv.FormatInt(t.UnixNano(), 16)
 	msgMap["pid"] = pingId
 	data, _ := json.Marshal(msgMap)
+	jsonLen := len(data)
+	if len(data) < client.payloadSize {
+		// fill the payload: {json}\x00{random}
+		data = append(data, make([]byte, client.payloadSize-jsonLen)...)
+		for i := jsonLen + 1; i < len(data); i++ {
+			data[i] = chars[rand.Intn(len(chars))]
+		}
+	}
 	cs.pingRequestRecords[pingId] = &clientPingRequestRecord{sentTime: t, sentBytes: int64(len(data))}
 	return data
 }
 
 func (client *Client) processPingResponse(t time.Time, cs *clientConnSession, data []byte) (map[string]any, error) {
+	jsonLen := bytes.IndexByte(data, 0)
+	if jsonLen == -1 {
+		jsonLen = len(data)
+	}
+
 	msgMap := map[string]any{}
-	err := json.Unmarshal(data, &msgMap)
+	err := json.Unmarshal(data[:jsonLen], &msgMap)
 	if err != nil {
 		return nil, err
 	}
